@@ -13,6 +13,8 @@ import timeit
 from copy import deepcopy
 from copy import copy
 
+from itertools import product
+
 
 TIME_LIMIT_MILLIS = 200
 
@@ -52,6 +54,7 @@ class Board(object):
         self.__board_state__ = [[Board.BLANK for i in range(width)] for j in range(height)]
         self.__last_player_move__ = {player_1: Board.NOT_MOVED, player_2: Board.NOT_MOVED}
         self.__player_symbols__ = {Board.BLANK: Board.BLANK, player_1: 1, player_2: 2}
+        self.center_square = (height//2, width//2)
 
     @property
     def active_player(self):
@@ -68,6 +71,17 @@ class Board(object):
         game state.
         """
         return self.__inactive_player__
+
+    def is_opening_move(self):
+        return self.move_count == 0
+
+    # def center_square(self):
+    #     return (self.height//2, self.width//2)
+
+    def opening_book(self):
+        book = list(product(self.center_square, (self.center_square[0] + 1, self.center_square[1] -1)))
+        book.append(self.center_square)
+        return book
 
     def get_opponent(self, player):
         """
@@ -349,3 +363,58 @@ class Board(object):
                 return self.__inactive_player__, move_history, "illegal move"
 
             self.apply_move(curr_move)
+
+    def play_viz(self, time_limit=TIME_LIMIT_MILLIS):
+        """
+        Execute a match between the players by alternately soliciting them
+        to select a move and applying it in the game.
+
+        Parameters
+        ----------
+        time_limit : numeric (optional)
+            The maximum number of milliseconds to allow before timeout
+            during each turn.
+
+        Returns
+        ----------
+        (player, list<[(int, int),]>, str)
+            Return multiple including the winning player, the complete game
+            move history, and a string indicating the reason for losing
+            (e.g., timeout or invalid move).
+        """
+        move_history = []
+
+        curr_time_millis = lambda: 1000 * timeit.default_timer()
+
+        while True:
+
+            legal_player_moves = self.get_legal_moves()
+
+            game_copy = self.copy()
+
+            move_start = curr_time_millis()
+            time_left = lambda : time_limit - (curr_time_millis() - move_start)
+            curr_move = self.active_player.get_move(game_copy, legal_player_moves, time_left)
+            move_end = time_left()
+
+            # print move_end
+
+            if curr_move is None:
+                curr_move = Board.NOT_MOVED
+
+            if self.active_player == self.__player_1__:
+                move_history.append([curr_move])
+            else:
+                move_history[-1].append(curr_move)
+
+            if move_end < 0:
+                return self.__inactive_player__, move_history, "timeout"
+
+            if curr_move not in legal_player_moves:
+                return self.__inactive_player__, move_history, "illegal move"
+
+            print(self.move_count)
+            print(self.active_player)
+            self.apply_move(curr_move)
+            print(self.to_string())
+
